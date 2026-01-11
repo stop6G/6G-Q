@@ -1,392 +1,414 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
-  Cell, ScatterChart, Scatter, ZAxis 
-} from 'recharts';
-import { Activity, Zap, Clock, AlertCircle, FileText, Database, Quote, Search, Calendar, Download } from 'lucide-react';
-
-const CSV_URL = "https://raw.githubusercontent.com/stop6G/6G-Q/refs/heads/main/ollama_cloud_benchmark.csv";
-
-// --- Robust Multi-line CSV Parser ---
-// This parser handles newlines INSIDE quotes, which simple split('\n') fails at.
-const parseCSV = (text) => {
-  const rows = [];
-  let currentRow = [];
-  let currentField = '';
-  let inQuote = false;
-  
-  // Normalize line endings
-  const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  for (let i = 0; i < cleanText.length; i++) {
-    const char = cleanText[i];
-    const nextChar = cleanText[i + 1];
-
-    if (char === '"') {
-      if (inQuote && nextChar === '"') {
-        // Handle escaped quotes ("") inside a quoted field
-        currentField += '"';
-        i++; // Skip the next quote
-      } else {
-        // Toggle quote state
-        inQuote = !inQuote;
-      }
-    } else if (char === ',' && !inQuote) {
-      // End of field
-      currentRow.push(currentField.trim());
-      currentField = '';
-    } else if (char === '\n' && !inQuote) {
-      // End of row
-      currentRow.push(currentField.trim());
-      // Only push if row is not completely empty
-      if (currentRow.length > 1 || (currentRow.length === 1 && currentRow[0] !== '')) {
-        rows.push(currentRow);
-      }
-      currentRow = [];
-      currentField = '';
-    } else {
-      currentField += char;
-    }
-  }
-  
-  // Handle last row if no newline at EOF
-  if (currentField || currentRow.length > 0) {
-    currentRow.push(currentField.trim());
-    rows.push(currentRow);
-  }
-
-  if (rows.length < 2) return [];
-
-  // Parse headers from first row
-  const headers = rows[0].map(h => h.replace(/^"|"$/g, '').toLowerCase()); // remove surrounding quotes just in case
-  
-  const data = [];
-  
-  for (let i = 1; i < rows.length; i++) {
-    const rowValues = rows[i];
-    
-    // Skip completely empty rows that might slip through
-    if (rowValues.length === 0) continue;
-
-    const entry = {};
-    headers.forEach((header, index) => {
-      // Remove surrounding quotes from values if they persist
-      let value = rowValues[index];
-      // Basic check to see if it's a number
-      if (value && !isNaN(parseFloat(value)) && isFinite(value)) {
-         entry[header] = parseFloat(value);
-      } else {
-         entry[header] = value;
-      }
-    });
-    data.push(entry);
-  }
-  return data;
-};
-
-// --- Helper for Date Formatting ---
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString; // Invalid date check
-    
-    // Format: "Oct 24, 2023 • 14:30"
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(date);
-  } catch (e) {
-    return dateString; // Return original string if parsing fails
-  }
-};
-
-// --- Main Component ---
-export default function App() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [manualInput, setManualInput] = useState("");
-  const [showManual, setShowManual] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(CSV_URL);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const text = await response.text();
-      processData(text);
-    } catch (e) {
-      console.error("Fetch error:", e);
-      setError("Failed to load data directly from GitHub (likely CORS restriction).");
-      setShowManual(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processData = (csvText) => {
-    try {
-      const rawData = parseCSV(csvText);
-      
-      // Filter logic: "dont use the entry if the response is empty"
-      const filtered = rawData.filter(row => {
-        // Check for common 'response' column names
-        const responseVal = row.response || row.output || row.content;
-        return responseVal && responseVal.toString().trim() !== "";
-      });
-
-      // Sort by eval_rate (speed) descending if available
-      filtered.sort((a, b) => (b.eval_rate || 0) - (a.eval_rate || 0));
-
-      setData(filtered);
-      setShowManual(false);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to parse CSV data.");
-    }
-  };
-
-  const handleManualSubmit = () => {
-    if (!manualInput) return;
-    processData(manualInput);
-  };
-
-  const downloadCSV = () => {
-    if (!data || data.length === 0) return;
-    
-    // Get headers
-    const headers = Object.keys(data[0]);
-    
-    // Construct CSV content
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(fieldName => {
-        let val = row[fieldName];
-        // Handle strings with quotes or commas
-        if (typeof val === 'string') {
-          val = `"${val.replace(/"/g, '""')}"`; 
-        }
-        return val;
-      }).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'ollama_benchmark_data.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const filteredData = useMemo(() => {
-    return data.filter(item => 
-      item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.response || item.output || item.content)?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [data, searchTerm]);
-
-  const stats = useMemo(() => {
-    if (data.length === 0) return { lastUpdate: 'N/A', totalTests: 0 };
-    
-    let latestDate = null;
-
-    data.forEach(item => {
-      const dateStr = item.created_at || item.timestamp || item.date;
-      if (dateStr) {
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) {
-             if (!latestDate || d > latestDate) {
-               latestDate = d;
-             }
-        }
-      }
-    });
-
-    return { 
-      lastUpdate: latestDate ? formatDate(latestDate.toISOString()) : 'N/A', 
-      totalTests: data.length 
-    };
-  }, [data]);
-
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-emerald-500">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-          <p className="text-slate-400 font-light tracking-widest">ANALYZING DATA STREAM...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6G-Q AI Awareness Benchmark</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons for lightweight icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #10b981; }
         
-        {/* Header */}
-        <header className="mb-12 border-b border-slate-800 pb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-            <div className="flex-1">
-              <h1 className="text-4xl font-extralight tracking-tight text-white mb-4">
-                6G-Q : <span className="font-bold text-emerald-500">6G AI AWARENESS</span>
-              </h1>
-              <p className="text-slate-400 text-sm leading-relaxed max-w-3xl">
-                we heard you like LLMs..right? ok... we ask them an easy question: 
-                <span className="block my-2 p-2 border-l-2 border-emerald-500/50 bg-slate-900/50 italic text-slate-300">
-                  "Explain in one simple sentence: Could 6G pose any serious problem in terms of Human Sovereignty, Cognitive Liberty, Opt-out rights, Total Surveillance, Biological Integrity, or Environmental Crisis?"
-                </span>
-                here you have their response. enjoy the fight. <a href="https://stop6g.eu" target="_blank" rel="noopener noreferrer" className="text-emerald-500 hover:text-emerald-400 hover:underline">stop6g.eu</a>
-              </p>
-            </div>
+        /* Utility for Masonry Layout */
+        .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+        
+        /* Smooth fade in */
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30 min-h-screen">
+
+    <div id="app" class="max-w-7xl mx-auto px-6 py-12">
+        <!-- Loading State -->
+        <div id="loading" class="min-h-[50vh] flex flex-col items-center justify-center text-emerald-500">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
+            <p class="text-slate-400 font-light tracking-widest">ANALYZING DATA STREAM...</p>
+        </div>
+
+        <!-- Main Content (Hidden by default) -->
+        <div id="main-content" class="hidden fade-in">
             
-            <div className="flex items-end gap-8 flex-shrink-0">
-               <div className="flex gap-8 text-sm">
-                  <div className="text-right">
-                      <p className="text-slate-500 uppercase text-xs tracking-wider">Models Evaluated</p>
-                      <p className="text-2xl font-light text-white">{stats.totalTests}</p>
-                  </div>
-                  <div className="text-right">
-                      <p className="text-slate-500 uppercase text-xs tracking-wider">Last Update</p>
-                      <p className="text-xl font-light text-emerald-400 whitespace-nowrap">{stats.lastUpdate}</p>
-                  </div>
-               </div>
-               
-               <button 
-                  onClick={downloadCSV}
-                  className="group flex items-center justify-center w-10 h-10 bg-slate-800 hover:bg-emerald-600 rounded-full transition-all duration-300 border border-slate-700 hover:border-emerald-500 text-slate-400 hover:text-white"
-                  title="Download CSV"
-               >
-                 <Download size={18} />
-               </button>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="mt-8 relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <input 
-              type="text" 
-              placeholder="Filter by model or content..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-full py-2 pl-10 pr-4 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors placeholder:text-slate-600"
-            />
-          </div>
-        </header>
-
-        {/* Manual Input Fallback */}
-        {showManual && (
-          <div className="mb-12 bg-slate-900/50 border border-red-900/50 p-6 rounded-lg backdrop-blur-sm">
-            <div className="flex items-start gap-4 mb-4">
-              <AlertCircle className="text-red-400 w-6 h-6 flex-shrink-0" />
-              <div>
-                <h3 className="text-red-400 font-medium">Auto-fetch failed</h3>
-                <p className="text-slate-400 text-sm mt-1">
-                  GitHub sometimes blocks direct automated requests (CORS). 
-                  Please copy the content of the CSV and paste it below.
-                </p>
-                <a 
-                  href={CSV_URL} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-emerald-500 hover:text-emerald-400 text-sm mt-2"
-                >
-                  <FileText size={14} /> Open CSV in new tab
-                </a>
-              </div>
-            </div>
-            <textarea
-              className="w-full h-48 bg-slate-950 border border-slate-800 rounded p-4 font-mono text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 transition-colors"
-              placeholder="Paste CSV content here..."
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-            />
-            <button
-              onClick={handleManualSubmit}
-              className="mt-4 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition-colors"
-            >
-              Visualize Data
-            </button>
-          </div>
-        )}
-
-        {/* No Data State */}
-        {!showManual && data.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-20 bg-slate-900/30 rounded-xl border border-dashed border-slate-800">
-            <Database className="w-12 h-12 text-slate-700 mb-4" />
-            <h3 className="text-xl text-slate-400 font-medium">No Data Found</h3>
-             <button onClick={() => setShowManual(true)} className="mt-6 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded transition-colors">
-              Try Manual Paste
-            </button>
-          </div>
-        )}
-
-        {/* Testimonies Masonry Layout */}
-        {!showManual && filteredData.length > 0 && (
-          <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-            {filteredData.map((item, index) => {
-              const responseText = item.response || item.output || item.content || "No response text found.";
-              // Look for various date fields
-              const dateVal = item.created_at || item.timestamp || item.date;
-              
-              return (
-                <div 
-                  key={index} 
-                  className="break-inside-avoid bg-slate-900/40 border border-slate-800 hover:border-emerald-500/30 rounded-xl p-6 transition-all duration-300 group"
-                >
-                  {/* Card Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <h2 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors break-all">
-                      {item.model}
-                    </h2>
-                    <Quote size={20} className="text-slate-700 group-hover:text-emerald-500/50 transition-colors" />
-                  </div>
-
-                  {/* Card Body (Response) */}
-                  <div className="relative">
-                    <div className="text-slate-400 text-sm leading-relaxed font-light whitespace-pre-wrap">
-                      {responseText.length > 500 ? (
-                         <>
-                           {responseText.slice(0, 500)}...
-                           <span className="italic text-slate-600 ml-1">[truncated]</span>
-                         </>
-                      ) : responseText}
+            <!-- Header -->
+            <header class="mb-12 border-b border-slate-800 pb-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div class="flex-1">
+                        <h1 class="text-4xl font-extralight tracking-tight text-white mb-4">
+                            6G-Q : <span class="font-bold text-emerald-500">6G AI AWARENESS</span>
+                        </h1>
+                        <p class="text-slate-400 text-sm leading-relaxed max-w-3xl">
+                            we heard you like LLMs..right? ok... we ask them an easy question: 
+                            <span class="block my-2 p-2 border-l-2 border-emerald-500/50 bg-slate-900/50 italic text-slate-300">
+                                "Explain in one simple sentence: Could 6G pose any serious problem in terms of Human Sovereignty, Cognitive Liberty, Opt-out rights, Total Surveillance, Biological Integrity, or Environmental Crisis?"
+                            </span>
+                            here you have their response. enjoy the fight. <a href="https://stop6g.eu" target="_blank" rel="noopener noreferrer" class="text-emerald-500 hover:text-emerald-400 hover:underline">stop6g.eu</a>
+                        </p>
                     </div>
-                  </div>
-
-                  {/* Card Footer (Metrics) */}
-                  <div className="mt-6 pt-4 border-t border-slate-800/50 flex items-center justify-between gap-4 text-xs text-slate-500 font-mono">
-                    <div className="flex items-center gap-1.5" title="Date of generation">
-                      <Calendar size={12} className="text-emerald-500" />
-                      <span>{formatDate(dateVal)}</span>
+                    
+                    <div class="flex items-end gap-8 flex-shrink-0">
+                       <div class="flex gap-8 text-sm">
+                          <div class="text-right">
+                              <p class="text-slate-500 uppercase text-xs tracking-wider">Models Evaluated</p>
+                              <p id="stat-total" class="text-2xl font-light text-white">0</p>
+                          </div>
+                          <div class="text-right">
+                              <p class="text-slate-500 uppercase text-xs tracking-wider">Last Update</p>
+                              <p id="stat-update" class="text-xl font-light text-emerald-400 whitespace-nowrap">N/A</p>
+                          </div>
+                       </div>
+                       
+                       <button onclick="downloadCSV()" class="group flex items-center justify-center w-10 h-10 bg-slate-800 hover:bg-emerald-600 rounded-full transition-all duration-300 border border-slate-700 hover:border-emerald-500 text-slate-400 hover:text-white" title="Download CSV">
+                         <i class="ph ph-download-simple text-lg"></i>
+                       </button>
                     </div>
-                    {item.total_duration && (
-                      <div className="flex items-center gap-1.5" title="Total Duration">
-                        <Clock size={12} className="text-purple-500" />
-                        <span>{(item.total_duration / 1000000000).toFixed(2)}s</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+
+                <!-- Search Bar -->
+                <div class="mt-8 relative max-w-md">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg"></i>
+                    <input 
+                        type="text" 
+                        id="search-input"
+                        placeholder="Filter by model or content..." 
+                        class="w-full bg-slate-900 border border-slate-800 rounded-full py-2 pl-10 pr-4 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors placeholder:text-slate-600"
+                    />
+                </div>
+            </header>
+
+            <!-- Error / Manual Input -->
+            <div id="error-container" class="hidden mb-12 bg-slate-900/50 border border-red-900/50 p-6 rounded-lg backdrop-blur-sm">
+                <div class="flex items-start gap-4 mb-4">
+                    <i class="ph ph-warning-circle text-red-400 text-2xl"></i>
+                    <div>
+                        <h3 class="text-red-400 font-medium">Auto-fetch failed</h3>
+                        <p class="text-slate-400 text-sm mt-1">
+                            GitHub sometimes blocks direct automated requests (CORS). 
+                            Please copy the content of the CSV and paste it below.
+                        </p>
+                        <a href="https://raw.githubusercontent.com/stop6G/6G-Q/refs/heads/main/ollama_cloud_benchmark.csv" target="_blank" class="inline-flex items-center gap-2 text-emerald-500 hover:text-emerald-400 text-sm mt-2">
+                           <i class="ph ph-file-text"></i> Open CSV in new tab
+                        </a>
+                    </div>
+                </div>
+                <textarea id="manual-input" class="w-full h-48 bg-slate-950 border border-slate-800 rounded p-4 font-mono text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 transition-colors" placeholder="Paste CSV content here..."></textarea>
+                <button onclick="handleManualSubmit()" class="mt-4 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition-colors">Visualize Data</button>
+            </div>
+
+            <!-- No Data Found -->
+            <div id="no-data" class="hidden flex flex-col items-center justify-center py-20 bg-slate-900/30 rounded-xl border border-dashed border-slate-800">
+                <i class="ph ph-database text-slate-700 text-5xl mb-4"></i>
+                <h3 class="text-xl text-slate-400 font-medium">No Data Found</h3>
+            </div>
+
+            <!-- Grid Container -->
+            <div id="grid-container" class="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6 pb-12">
+                <!-- Cards will be injected here -->
+            </div>
+        </div>
     </div>
-  );
-}
+
+    <script>
+        // --- Configuration ---
+        const CSV_URL = "https://raw.githubusercontent.com/stop6G/6G-Q/refs/heads/main/ollama_cloud_benchmark.csv";
+        let globalData = [];
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+            
+            // Search Listener
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                renderGrid(term);
+            });
+        });
+
+        // --- Data Fetching ---
+        async function fetchData() {
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const text = await response.text();
+                processData(text);
+            } catch (e) {
+                console.error("Fetch error:", e);
+                showErrorState();
+            }
+        }
+
+        function handleManualSubmit() {
+            const text = document.getElementById('manual-input').value;
+            if(text) processData(text);
+        }
+
+        // --- CSV Parsing (Robust Multi-line) ---
+        function parseCSV(text) {
+            const rows = [];
+            let currentRow = [];
+            let currentField = '';
+            let inQuote = false;
+            
+            // Normalize newlines
+            const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            for (let i = 0; i < cleanText.length; i++) {
+                const char = cleanText[i];
+                const nextChar = cleanText[i + 1];
+
+                if (char === '"') {
+                    if (inQuote && nextChar === '"') {
+                        currentField += '"';
+                        i++; 
+                    } else {
+                        inQuote = !inQuote;
+                    }
+                } else if (char === ',' && !inQuote) {
+                    currentRow.push(currentField.trim());
+                    currentField = '';
+                } else if (char === '\n' && !inQuote) {
+                    currentRow.push(currentField.trim());
+                    if (currentRow.length > 1 || (currentRow.length === 1 && currentRow[0] !== '')) {
+                        rows.push(currentRow);
+                    }
+                    currentRow = [];
+                    currentField = '';
+                } else {
+                    currentField += char;
+                }
+            }
+            if (currentField || currentRow.length > 0) {
+                currentRow.push(currentField.trim());
+                rows.push(currentRow);
+            }
+
+            if (rows.length < 2) return [];
+
+            const headers = rows[0].map(h => h.replace(/^"|"$/g, '').toLowerCase());
+            
+            const data = [];
+            for (let i = 1; i < rows.length; i++) {
+                const rowValues = rows[i];
+                if (rowValues.length === 0) continue;
+
+                const entry = {};
+                headers.forEach((header, index) => {
+                    let value = rowValues[index];
+                    if (value && !isNaN(parseFloat(value)) && isFinite(value)) {
+                        entry[header] = parseFloat(value);
+                    } else {
+                        entry[header] = value;
+                    }
+                });
+                data.push(entry);
+            }
+            return data;
+        }
+
+        function processData(csvText) {
+            try {
+                const rawData = parseCSV(csvText);
+                
+                // Filter: remove empty responses
+                const filtered = rawData.filter(row => {
+                    const responseVal = row.response || row.output || row.content;
+                    return responseVal && responseVal.toString().trim() !== "";
+                });
+
+                // Sort by speed (eval_rate) descending
+                filtered.sort((a, b) => (b.eval_rate || 0) - (a.eval_rate || 0));
+
+                globalData = filtered;
+                
+                if (globalData.length > 0) {
+                    updateStats();
+                    renderGrid();
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('error-container').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('hidden');
+                } else {
+                    showNoData();
+                }
+
+            } catch (err) {
+                console.error(err);
+                showErrorState();
+            }
+        }
+
+        // --- UI Rendering ---
+        
+        function updateStats() {
+            // Total Models
+            document.getElementById('stat-total').innerText = globalData.length;
+
+            // Last Update
+            let latestDate = null;
+            globalData.forEach(item => {
+                const dateStr = item.created_at || item.timestamp || item.date;
+                if (dateStr) {
+                    const d = new Date(dateStr);
+                    if (!isNaN(d.getTime())) {
+                        if (!latestDate || d > latestDate) latestDate = d;
+                    }
+                }
+            });
+            document.getElementById('stat-update').innerText = formatDate(latestDate);
+        }
+
+        function formatDate(dateObj) {
+            if (!dateObj) return 'N/A';
+            return new Intl.DateTimeFormat('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            }).format(dateObj);
+        }
+
+        function renderGrid(filterTerm = "") {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = "";
+
+            const filtered = globalData.filter(item => {
+                const term = filterTerm.toLowerCase();
+                const content = (item.response || item.output || item.content || "").toLowerCase();
+                const model = (item.model || "").toLowerCase();
+                return model.includes(term) || content.includes(term);
+            });
+
+            if (filtered.length === 0) {
+                document.getElementById('no-data').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('no-data').classList.add('hidden');
+
+            filtered.forEach((item, index) => {
+                const card = createCard(item, index);
+                container.appendChild(card);
+            });
+        }
+
+        function createCard(item, index) {
+            const div = document.createElement('div');
+            div.className = "break-inside-avoid bg-slate-900/40 border border-slate-800 hover:border-emerald-500/30 rounded-xl p-6 transition-all duration-300 group mb-6";
+            
+            const responseText = item.response || item.output || item.content || "No response text found.";
+            const dateVal = item.created_at || item.timestamp || item.date;
+            const dateObj = dateVal ? new Date(dateVal) : null;
+            const isLong = responseText.length > 500;
+            const modelName = item.model || "";
+            
+            // Format model name: replace colons with spaces
+            const displayModelName = (item.model || 'Unknown Model').replace(/:/g, ' ');
+
+            // Safe Text for HTML
+            const safeText = responseText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const shortText = isLong ? safeText.slice(0, 500) + "..." : safeText;
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors break-all">
+                        ${displayModelName}
+                    </h2>
+                    <i class="ph ph-quotes text-slate-700 text-xl group-hover:text-emerald-500/50 transition-colors"></i>
+                </div>
+
+                <div class="relative">
+                    <div id="text-${index}" class="text-slate-400 text-sm leading-relaxed font-light whitespace-pre-wrap transition-all">
+                        ${shortText}
+                    </div>
+                    ${isLong ? `
+                        <button onclick="toggleText(this, ${index})" class="mt-2 text-xs font-medium text-emerald-500 hover:text-emerald-400 flex items-center gap-1 focus:outline-none select-none">
+                            <span>Read more</span> <i class="ph ph-caret-down"></i>
+                        </button>
+                        <textarea id="full-${index}" class="hidden">${safeText}</textarea>
+                        <textarea id="short-${index}" class="hidden">${shortText}</textarea>
+                    ` : ''}
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-800/50 flex items-center justify-between gap-4 text-xs text-slate-500 font-mono">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1.5" title="Date of generation">
+                            <i class="ph ph-calendar text-emerald-500"></i>
+                            <span>${formatDate(dateObj)}</span>
+                        </div>
+                        <a href="https://llm-explorer.com/list/?query=${encodeURIComponent(modelName)}" target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-emerald-400 transition-colors" title="Search model on LLM Explorer">
+                            <i class="ph ph-arrow-square-out text-sm"></i>
+                        </a>
+                    </div>
+                    ${item.total_duration ? `
+                    <div class="flex items-center gap-1.5" title="Total Duration">
+                        <i class="ph ph-clock text-purple-500"></i>
+                        <span>${(item.total_duration / 1000000000).toFixed(2)}s</span>
+                    </div>` : ''}
+                </div>
+            `;
+            return div;
+        }
+
+        // --- Interaction Logic ---
+        function toggleText(btn, index) {
+            const textDiv = document.getElementById(`text-${index}`);
+            const fullText = document.getElementById(`full-${index}`).value;
+            const shortText = document.getElementById(`short-${index}`).value;
+            const icon = btn.querySelector('i');
+            const span = btn.querySelector('span');
+
+            if (span.innerText === "Read more") {
+                textDiv.innerHTML = fullText;
+                span.innerText = "Show less";
+                icon.classList.replace('ph-caret-down', 'ph-caret-up');
+            } else {
+                textDiv.innerHTML = shortText;
+                span.innerText = "Read more";
+                icon.classList.replace('ph-caret-up', 'ph-caret-down');
+            }
+        }
+
+        function downloadCSV() {
+            if (!globalData || globalData.length === 0) return;
+            
+            // Get all unique headers from all objects to ensure consistency
+            const headers = Array.from(new Set(globalData.flatMap(Object.keys)));
+            
+            const csvContent = [
+                headers.join(','),
+                ...globalData.map(row => headers.map(fieldName => {
+                    let val = row[fieldName] || ""; // Handle missing fields
+                    if (typeof val === 'string') {
+                        val = `"${val.replace(/"/g, '""')}"`; 
+                    }
+                    return val;
+                }).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'ollama_benchmark_data.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- States ---
+        function showErrorState() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden'); // Show layout so manual input works
+            document.getElementById('error-container').classList.remove('hidden');
+        }
+
+        function showNoData() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('no-data').classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>
