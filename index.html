@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,9 +10,9 @@
     <style>
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #10b981; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
         /* Utility for Masonry Layout */
         .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
@@ -22,47 +22,47 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30 min-h-screen">
+<body class="bg-white text-slate-600 font-sans selection:bg-pink-100 min-h-screen">
 
     <div id="app" class="max-w-7xl mx-auto px-6 py-12">
         <!-- Loading State -->
-        <div id="loading" class="min-h-[50vh] flex flex-col items-center justify-center text-emerald-500">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
-            <p class="text-slate-400 font-light tracking-widest">ANALYZING DATA STREAM...</p>
+        <div id="loading" class="min-h-[50vh] flex flex-col items-center justify-center text-slate-900">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mb-4"></div>
+            <p class="text-slate-400 font-light tracking-widest text-xs uppercase">Reading Data Stream</p>
         </div>
 
         <!-- Main Content (Hidden by default) -->
         <div id="main-content" class="hidden fade-in">
             
             <!-- Header -->
-            <header class="mb-12 border-b border-slate-800 pb-8">
+            <header class="mb-12 border-b border-slate-100 pb-8">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div class="flex-1">
-                        <h1 class="text-4xl font-extralight tracking-tight text-white mb-4">
-                            6G-Q : <span class="font-bold text-emerald-500">6G AI AWARENESS</span>
+                        <h1 class="text-4xl font-extralight tracking-tight text-slate-900 mb-4">
+                            6G-Q : <span class="font-bold text-pink-500">6G AI AWARENESS</span>
                         </h1>
-                        <p class="text-slate-400 text-sm leading-relaxed max-w-3xl">
+                        <p class="text-slate-500 text-sm leading-relaxed max-w-3xl">
                             we heard you like LLMs..right? ok... we ask them an easy question: 
-                            <span class="block my-2 p-2 border-l-2 border-emerald-500/50 bg-slate-900/50 italic text-slate-300">
+                            <span class="block my-3 p-4 border-l-2 border-slate-900 bg-slate-50 italic text-slate-800">
                                 "Explain in one simple sentence: Could 6G pose any serious problem in terms of Human Sovereignty, Cognitive Liberty, Opt-out rights, Total Surveillance, Biological Integrity, or Environmental Crisis?"
                             </span>
-                            here you have their response. enjoy the fight. <a href="https://stop6g.eu" target="_blank" rel="noopener noreferrer" class="text-emerald-500 hover:text-emerald-400 hover:underline">stop6g.eu</a>
+                            here you have their response. enjoy the fight. <a href="https://stop6g.eu" target="_blank" rel="noopener noreferrer" class="text-slate-900 font-medium hover:underline underline-offset-2">stop6g.eu</a>
                         </p>
                     </div>
                     
                     <div class="flex items-end gap-8 flex-shrink-0">
                        <div class="flex gap-8 text-sm">
                           <div class="text-right">
-                              <p class="text-slate-500 uppercase text-xs tracking-wider">Models Evaluated</p>
-                              <p id="stat-total" class="text-2xl font-light text-white">0</p>
+                              <p class="text-slate-400 uppercase text-xs tracking-wider">Models</p>
+                              <p id="stat-total" class="text-2xl font-light text-pink-500">0</p>
                           </div>
                           <div class="text-right">
-                              <p class="text-slate-500 uppercase text-xs tracking-wider">Last Update</p>
-                              <p id="stat-update" class="text-xl font-light text-emerald-400 whitespace-nowrap">N/A</p>
+                              <p class="text-slate-400 uppercase text-xs tracking-wider">Last Update</p>
+                              <p id="stat-update" class="text-xl font-light text-pink-500 whitespace-nowrap">N/A</p>
                           </div>
                        </div>
                        
-                       <button onclick="downloadCSV()" class="group flex items-center justify-center w-10 h-10 bg-slate-800 hover:bg-emerald-600 rounded-full transition-all duration-300 border border-slate-700 hover:border-emerald-500 text-slate-400 hover:text-white" title="Download CSV">
+                       <button onclick="downloadCSV()" class="group flex items-center justify-center w-10 h-10 bg-white hover:bg-slate-50 rounded-full transition-all duration-300 border border-slate-200 hover:border-slate-400 text-slate-400 hover:text-slate-900" title="Download CSV">
                          <i class="ph ph-download-simple text-lg"></i>
                        </button>
                     </div>
@@ -70,38 +70,38 @@
 
                 <!-- Search Bar -->
                 <div class="mt-8 relative max-w-md">
-                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg"></i>
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
                     <input 
                         type="text" 
                         id="search-input"
                         placeholder="Filter by model or content..." 
-                        class="w-full bg-slate-900 border border-slate-800 rounded-full py-2 pl-10 pr-4 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors placeholder:text-slate-600"
+                        class="w-full bg-white border border-slate-200 rounded-full py-2 pl-10 pr-4 text-sm text-slate-800 focus:outline-none focus:border-slate-400 transition-colors placeholder:text-slate-300"
                     />
                 </div>
             </header>
 
             <!-- Error / Manual Input -->
-            <div id="error-container" class="hidden mb-12 bg-slate-900/50 border border-red-900/50 p-6 rounded-lg backdrop-blur-sm">
+            <div id="error-container" class="hidden mb-12 bg-red-50 border border-red-100 p-6 rounded-lg">
                 <div class="flex items-start gap-4 mb-4">
-                    <i class="ph ph-warning-circle text-red-400 text-2xl"></i>
+                    <i class="ph ph-warning-circle text-red-800 text-2xl"></i>
                     <div>
-                        <h3 class="text-red-400 font-medium">Auto-fetch failed</h3>
-                        <p class="text-slate-400 text-sm mt-1">
+                        <h3 class="text-red-900 font-medium">Auto-fetch failed</h3>
+                        <p class="text-red-700 text-sm mt-1">
                             GitHub sometimes blocks direct automated requests (CORS). 
                             Please copy the content of the CSV and paste it below.
                         </p>
-                        <a href="https://raw.githubusercontent.com/stop6G/6G-Q/refs/heads/main/ollama_cloud_benchmark.csv" target="_blank" class="inline-flex items-center gap-2 text-emerald-500 hover:text-emerald-400 text-sm mt-2">
+                        <a href="https://raw.githubusercontent.com/stop6G/6G-Q/refs/heads/main/ollama_cloud_benchmark.csv" target="_blank" class="inline-flex items-center gap-2 text-slate-900 hover:underline text-sm mt-2">
                            <i class="ph ph-file-text"></i> Open CSV in new tab
                         </a>
                     </div>
                 </div>
-                <textarea id="manual-input" class="w-full h-48 bg-slate-950 border border-slate-800 rounded p-4 font-mono text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 transition-colors" placeholder="Paste CSV content here..."></textarea>
-                <button onclick="handleManualSubmit()" class="mt-4 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition-colors">Visualize Data</button>
+                <textarea id="manual-input" class="w-full h-48 bg-white border border-slate-200 rounded p-4 font-mono text-xs text-slate-600 focus:outline-none focus:border-slate-400 transition-colors" placeholder="Paste CSV content here..."></textarea>
+                <button onclick="handleManualSubmit()" class="mt-4 px-6 py-2 bg-slate-900 hover:bg-black text-white text-sm font-medium rounded transition-colors">Visualize Data</button>
             </div>
 
             <!-- No Data Found -->
-            <div id="no-data" class="hidden flex flex-col items-center justify-center py-20 bg-slate-900/30 rounded-xl border border-dashed border-slate-800">
-                <i class="ph ph-database text-slate-700 text-5xl mb-4"></i>
+            <div id="no-data" class="hidden flex flex-col items-center justify-center py-20 border border-dashed border-slate-200 rounded-xl">
+                <i class="ph ph-database text-slate-300 text-5xl mb-4"></i>
                 <h3 class="text-xl text-slate-400 font-medium">No Data Found</h3>
             </div>
 
@@ -294,7 +294,8 @@
 
         function createCard(item, index) {
             const div = document.createElement('div');
-            div.className = "break-inside-avoid bg-slate-900/40 border border-slate-800 hover:border-emerald-500/30 rounded-xl p-6 transition-all duration-300 group mb-6";
+            // Minimal Card Style: White bg, very subtle border, slight shadow on hover
+            div.className = "break-inside-avoid bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-6 transition-all duration-300 group mb-6 shadow-sm hover:shadow-md";
             
             const responseText = item.response || item.output || item.content || "No response text found.";
             const dateVal = item.created_at || item.timestamp || item.date;
@@ -302,8 +303,15 @@
             const isLong = responseText.length > 500;
             const modelName = item.model || "";
             
-            // Format model name: replace colons with spaces
-            const displayModelName = (item.model || 'Unknown Model').replace(/:/g, ' ');
+            // Format for DISPLAY: Keep original (e.g., cogito-2.1:671b)
+            const displayModelName = item.model || 'Unknown Model';
+
+            // Format for SEARCH QUERY: 
+            // 1. Take part before ':'
+            // 2. Replace '-' with space
+            // e.g., cogito-2.1:671b -> cogito 2.1
+            let queryModelName = modelName.split(':')[0];
+            queryModelName = queryModelName.replace(/-/g, ' ');
 
             // Safe Text for HTML
             const safeText = responseText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -311,18 +319,23 @@
 
             div.innerHTML = `
                 <div class="flex justify-between items-start mb-4">
-                    <h2 class="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors break-all">
-                        ${displayModelName}
-                    </h2>
-                    <i class="ph ph-quotes text-slate-700 text-xl group-hover:text-emerald-500/50 transition-colors"></i>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-bold bg-slate-800 text-white px-2 py-1 rounded inline-block break-all shadow-sm">
+                            ${displayModelName}
+                        </h2>
+                        <a href="https://llm-explorer.com/list/?query=${encodeURIComponent(queryModelName)}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-slate-900 transition-colors flex items-center" title="Search model on LLM Explorer">
+                            <i class="ph ph-arrow-square-out text-lg"></i>
+                        </a>
+                    </div>
+                    <i class="ph ph-quotes text-slate-100 text-xl group-hover:text-slate-200 transition-colors"></i>
                 </div>
 
                 <div class="relative">
-                    <div id="text-${index}" class="text-slate-400 text-sm leading-relaxed font-light whitespace-pre-wrap transition-all">
+                    <div id="text-${index}" class="text-slate-600 text-sm leading-relaxed font-normal whitespace-pre-wrap transition-all">
                         ${shortText}
                     </div>
                     ${isLong ? `
-                        <button onclick="toggleText(this, ${index})" class="mt-2 text-xs font-medium text-emerald-500 hover:text-emerald-400 flex items-center gap-1 focus:outline-none select-none">
+                        <button onclick="toggleText(this, ${index})" class="mt-2 text-xs font-bold text-slate-900 hover:underline decoration-1 flex items-center gap-1 focus:outline-none select-none">
                             <span>Read more</span> <i class="ph ph-caret-down"></i>
                         </button>
                         <textarea id="full-${index}" class="hidden">${safeText}</textarea>
@@ -330,19 +343,14 @@
                     ` : ''}
                 </div>
 
-                <div class="mt-6 pt-4 border-t border-slate-800/50 flex items-center justify-between gap-4 text-xs text-slate-500 font-mono">
-                    <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-1.5" title="Date of generation">
-                            <i class="ph ph-calendar text-emerald-500"></i>
-                            <span>${formatDate(dateObj)}</span>
-                        </div>
-                        <a href="https://llm-explorer.com/list/?query=${encodeURIComponent(modelName)}" target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-emerald-400 transition-colors" title="Search model on LLM Explorer">
-                            <i class="ph ph-arrow-square-out text-sm"></i>
-                        </a>
+                <div class="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between gap-4 text-xs text-slate-400 font-mono">
+                    <div class="flex items-center gap-1.5" title="Date of generation">
+                        <i class="ph ph-calendar text-slate-400"></i>
+                        <span>${formatDate(dateObj)}</span>
                     </div>
                     ${item.total_duration ? `
                     <div class="flex items-center gap-1.5" title="Total Duration">
-                        <i class="ph ph-clock text-purple-500"></i>
+                        <i class="ph ph-clock text-slate-300"></i>
                         <span>${(item.total_duration / 1000000000).toFixed(2)}s</span>
                     </div>` : ''}
                 </div>
